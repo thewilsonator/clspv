@@ -17,13 +17,11 @@ add_library(clspv_core
   ${CMAKE_CURRENT_SOURCE_DIR}/ArgKind.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ClusterPodKernelArgumentsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ClusterConstants.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/Compiler.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ConstantEmitter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DefineOpenCLWorkItemBuiltinsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorCounter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorMap.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DirectResourceAccessPass.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/FrontendPlugin.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FunctionInternalizerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/HideConstantLoadsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineEntryPointsPass.cpp
@@ -53,32 +51,51 @@ add_library(clspv_core
   ${CMAKE_CURRENT_SOURCE_DIR}/UndoTruncatedSwitchConditionPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ZeroInitializeAllocasPass.cpp
 )
+if(NOT CSLPV_PASSES_ONLY)
+  add_library(clspv_frontend
+    ${CMAKE_CURRENT_SOURCE_DIR}/Compiler.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/FrontendPlugin.cpp
+  )
+endif()
 
 # Enable C++11 for our executable
 target_compile_features(clspv_core PRIVATE cxx_range_for)
+if(NOT CSLPV_PASSES_ONLY)
+  target_compile_features(clspv_frontend PRIVATE cxx_range_for)
+endif()
 
 target_include_directories(clspv_core PRIVATE ${SPIRV_HEADERS_INCLUDE_DIRS})
-
 target_include_directories(clspv_core PRIVATE ${LLVM_INCLUDE_DIRS})
-
-target_include_directories(clspv_core PRIVATE ${CLANG_INCLUDE_DIRS})
-
 target_include_directories(clspv_core PUBLIC ${CLSPV_INCLUDE_DIRS})
+
+if(NOT CSLPV_PASSES_ONLY)
+ target_include_directories(clspv_frontend PRIVATE ${SPIRV_HEADERS_INCLUDE_DIRS})
+ target_include_directories(clspv_frontend PRIVATE ${LLVM_INCLUDE_DIRS})
+ target_include_directories(clspv_frontend PUBLIC ${CLSPV_INCLUDE_DIRS})
+ target_include_directories(clspv_frontend PRIVATE ${CLANG_INCLUDE_DIRS})
+endif()
 
 if(${EXTERNAL_LLVM} EQUAL 1)
   include(${CLSPV_LLVM_BINARY_DIR}/lib/cmake/llvm/LLVMConfig.cmake)
 
   set(CLSPV_LLVM_COMPONENTS clangCodeGen LLVMAnalysis LLVMScalarOpts LLVMCore)
+  if(CSLPV_PASSES_ONLY)
+    set(CLSPV_LLVM_COMPONENTS LLVMAnalysis LLVMScalarOpts LLVMCore)
+  else()
+    set(CLSPV_LLVM_COMPONENTS clangCodeGen LLVMAnalysis LLVMScalarOpts LLVMCore)
+    include(${CLSPV_LLVM_BINARY_DIR}/../lib/cmake/clang/ClangConfig.cmake)
+    target_link_libraries(clspv_frontend PRIVATE clangCodeGen ${CLSPV_LLVM_COMPONENTS})
+  endif()
   llvm_map_components_to_libnames(CLSPV_LLVM_LINKS ${CLSPV_LLVM_COMPONENTS})
 
-  include(${CLSPV_LLVM_BINARY_DIR}/../lib/cmake/clang/ClangConfig.cmake)
-
-  target_link_libraries(clspv_core PRIVATE clangCodeGen ${CLSPV_LLVM_COMPONENTS})
+  target_link_libraries(clspv_core PRIVATE ${CLSPV_LLVM_COMPONENTS})
 else()
   target_link_libraries(clspv_core PRIVATE clangCodeGen LLVMAnalysis LLVMCore LLVMScalarOpts)
 endif()
 
-add_dependencies(clspv_core clspv_baked_opencl_header clspv_c_strings clspv_glsl)
+if(NOT CSLPV_PASSES_ONLY)
+  add_dependencies(clspv_frontend clspv_baked_opencl_header clspv_c_strings clspv_glsl)
+endif()
 
 if (MSVC)
   set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/SPIRVProducerPass.cpp"

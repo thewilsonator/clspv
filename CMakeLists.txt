@@ -68,7 +68,7 @@ endif()
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(SPIRV_TOOLS_BINARY_DIR "$<TARGET_FILE_DIR:spirv-dis>")
-
+set(CSLPV_PASSES_ONLY OFF)
 if (NOT DEFINED EXTERNAL_LLVM)
   set(EXTERNAL_LLVM 0)
 endif()
@@ -76,7 +76,7 @@ if (${EXTERNAL_LLVM} EQUAL 1)
   if (NOT DEFINED CLSPV_LLVM_SOURCE_DIR)
     message(FATAL_ERROR "External LLVM requires CLSPV_LLVM_SOURCE_DIR to be specified")
   endif()
-  if (NOT DEFINED CLSPV_CLANG_SOURCE_DIR)
+  if (NOT DEFINED CLSPV_CLANG_SOURCE_DIR AND NOT CSLPV_PASSES_ONLY)
     message(FATAL_ERROR "External LLVM requires CLSPV_CLANG_SOURCE_DIR to be specified")
   endif()
   if (NOT DEFINED CLSPV_LLVM_BINARY_DIR)
@@ -114,11 +114,13 @@ set(LLVM_INCLUDE_DIRS
   ${CLSPV_LLVM_BINARY_DIR}/include
 )
 
-set(CLANG_SOURCE_DIR ${CLSPV_CLANG_SOURCE_DIR})
-set(CLANG_INCLUDE_DIRS
-  ${CLANG_SOURCE_DIR}/include
-  ${CLSPV_LLVM_BINARY_DIR}/tools/clang/include
+if(NOT CSLPV_PASSES_ONLY)
+  set(CLANG_SOURCE_DIR ${CLSPV_CLANG_SOURCE_DIR})
+  set(CLANG_INCLUDE_DIRS
+    ${CLANG_SOURCE_DIR}/include
+    ${CLSPV_LLVM_BINARY_DIR}/tools/clang/include
 )
+endif()
 
 if(NOT WIN32)
   # Disable RTTI and exceptions (to match LLVM)
@@ -130,13 +132,13 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # Bring in our lib folder
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib)
+if(NOT CSLPV_PASSES_ONLY)
+  # Bring in our tools folder
+  add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tools)
 
-# Bring in our tools folder
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tools)
-
-# Bring in our test folder
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/test)
-
+  # Bring in our test folder
+  add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/test)
+endif()
 
 if(ENABLE_CLSPV_TOOLS_INSTALL)
   install(
